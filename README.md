@@ -7,13 +7,74 @@ Kotlin / Spring Boot 3 API for the Alternative Capital Partners Capital Call Tra
 - Kotlin 1.9, Spring Boot 3.3, Java 21
 - `spring-boot-starter-web`, `-security`, `-oauth2-resource-server`, `-data-jpa`, `-validation`, `-actuator`
 - `kotlinx-coroutines-core` / `-reactor` for the async notice-generation feature
-- H2 in-memory database for local development
+- PostgreSQL (via Docker) for local development
 - JUnit 5 + MockK + springmockk for tests
 
 ## Prerequisites
 
 - JDK 21
 - No local Gradle install needed — use the wrapper (`./gradlew`, `gradlew.bat`)
+- Docker, for running PostgreSQL locally (see below)
+
+## Configuration & secrets
+
+Database credentials and Azure IDs are **not** committed to the repo. `application.yml`
+only references env var placeholders (`${DB_URL}`, `${DB_USERNAME}`, `${DB_PASSWORD}`,
+`${AZURE_TENANT_ID}`, `${AZURE_API_CLIENT_ID}`) — no real values.
+
+For local dev, copy the template and fill in real values:
+
+```bash
+cp .env.example .env
+```
+
+`.env` is gitignored and never pushed. `./gradlew bootRun` and `./gradlew test` load it
+automatically (see the `dotenv` block in `build.gradle.kts`) and export its keys as
+process environment variables for that run — nothing is written back into
+`application.yml`. If `.env` is missing (e.g. in CI), the loader is a no-op.
+
+For CI/staging/production, set the real values as actual environment variables on the
+platform (CI secrets, container/orchestrator config, etc.) rather than shipping a
+`.env` file — `.env` is a local-dev convenience only.
+
+The DB values have no defaults, so the app **won't boot** until `DB_URL` / `DB_USERNAME`
+/ `DB_PASSWORD` are set — that's intentional; a silent fallback to the wrong database is
+worse than a fast failure.
+
+## Database (PostgreSQL via Docker)
+
+The app connects to PostgreSQL using `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` (see
+`.env.example` and the Configuration section above). Start a local container with plain
+`docker run` — no Dockerfile or compose file needed:
+
+```bash
+docker run --name capitalcall-postgres \
+  -e POSTGRES_DB=capitalcall \
+  -e POSTGRES_USER=capitalcall \
+  -e POSTGRES_PASSWORD=capitalcall \
+  -p 5432:5432 \
+  -v capitalcall-postgres-data:/var/lib/postgresql/data \
+  -d postgres:16
+```
+
+- `-v capitalcall-postgres-data:/var/lib/postgresql/data` persists data in a named
+  volume across container restarts.
+- The `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` above must match
+  `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` in your `.env` file — the defaults in
+  `.env.example` already match this command, so they work out of the box.
+
+Day-to-day container management:
+
+```bash
+docker stop capitalcall-postgres     # stop
+docker start capitalcall-postgres    # start again (data persists)
+docker logs -f capitalcall-postgres  # tail logs
+docker rm -f capitalcall-postgres    # remove container (volume survives)
+docker volume rm capitalcall-postgres-data  # wipe data
+```
+
+Hibernate's `ddl-auto: update` creates/updates the schema automatically on startup,
+so no manual migration step is needed for local development.
 
 ## Entra ID setup (do this first)
 
@@ -34,16 +95,17 @@ for the full walkthrough):
 4. Sign in once, decode your access token at [jwt.ms](https://jwt.ms), and copy the
    `oid` claim.
 
-Set the following environment variables before running with real auth:
+Set the following in your `.env` file (see Configuration & secrets above) before running
+with real auth:
 
 ```
 AZURE_TENANT_ID=<directory-tenant-id>
 AZURE_API_CLIENT_ID=<capitalcall-api-application-client-id>
 ```
 
-Without them the app still boots (JWKS lookup is lazy, only happens on first token
-validation), but every request will be rejected with an invalid-token error — this is
-expected until the env vars are set to real values.
+Without them the app still boots against the `.env.example` placeholders (JWKS lookup is
+lazy, only happens on first token validation), but every request will be rejected with
+an invalid-token error — this is expected until they're set to real values.
 
 ### Seeding your own `oid`
 
@@ -79,13 +141,13 @@ API error content.
 
 ## Running locally
 
+Make sure the PostgreSQL container (above) is running first, then:
+
 ```bash
 ./gradlew bootRun
 ```
 
 - API: `http://localhost:8080`
-- H2 console: `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:capitalcall`,
-  user `sa`, no password) — permitted without auth, local only.
 - Health check: `http://localhost:8080/actuator/health` — permitted without auth.
 
 ## Tests
@@ -94,14 +156,12 @@ API error content.
 ./gradlew test
 ```
 
-## Swapping H2 for Azure SQL
+## Swapping PostgreSQL for Azure SQL
 
-Local development uses H2 in-memory so the app runs with zero external dependencies.
 Moving to Azure SQL is a datasource/driver + `application.yml` change only:
 
-- Replace the `com.h2database:h2` runtime dependency with the MS SQL JDBC driver.
+- Replace the `org.postgresql:postgresql` runtime dependency with the MS SQL JDBC driver.
 - Update `spring.datasource.url` / `driver-class-name` / credentials.
-- Remove/disable the H2 console config.
 
 No application code changes are required — JPA entities and repositories are
 database-agnostic.

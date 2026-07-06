@@ -40,7 +40,7 @@ dependencies {
 	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion")
 	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$kotlinCoroutinesVersion")
 
-	runtimeOnly("com.h2database:h2")
+	runtimeOnly("org.postgresql:postgresql")
 
 	testImplementation("org.springframework.boot:spring-boot-starter-test") {
 		exclude(module = "mockito-core")
@@ -68,4 +68,22 @@ tasks.withType<KotlinCompile> {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+// Loads local secrets (DB credentials, Azure IDs) from a gitignored .env file so
+// `./gradlew bootRun` works without exporting env vars by hand. In CI/production,
+// the real env vars are set by the platform and .env is simply absent — this is a no-op then.
+val dotenv: Map<String, String> = file(".env").let { envFile ->
+	if (!envFile.exists()) emptyMap()
+	else envFile.readLines()
+		.map { it.trim() }
+		.filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+		.associate { line ->
+			val (key, value) = line.split("=", limit = 2)
+			key.trim() to value.trim()
+		}
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+	environment(dotenv)
 }

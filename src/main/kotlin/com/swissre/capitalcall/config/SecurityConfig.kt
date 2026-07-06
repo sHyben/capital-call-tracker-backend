@@ -31,12 +31,10 @@ class SecurityConfig(
 			.csrf { it.disable() }
 			.cors { it.configurationSource(corsConfigurationSource()) }
 			.sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
-			// H2 console renders in a frame; safe locally since it's only ever exposed on localhost.
-			.headers { headers -> headers.frameOptions { it.sameOrigin() } }
 			.authorizeHttpRequests { authorize ->
 				authorize
 					.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-					.requestMatchers("/actuator/health", "/h2-console/**").permitAll()
+					.requestMatchers("/actuator/health").permitAll()
 					.anyRequest().authenticated()
 			}
 			.oauth2ResourceServer { oauth2 ->
