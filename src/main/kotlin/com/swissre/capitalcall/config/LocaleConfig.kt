@@ -20,7 +20,7 @@ class LocaleConfig {
 	@Bean
 	fun localeResolver(): LocaleResolver {
 		val resolver = AcceptHeaderLocaleResolver()
-		resolver.supportedLocales = listOf(Locale.ENGLISH, Locale("sk"))
+		resolver.supportedLocales = listOf(Locale.ENGLISH, Locale.of("sk"))
 		resolver.setDefaultLocale(Locale.ENGLISH)
 		return resolver
 	}

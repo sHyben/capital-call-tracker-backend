@@ -4,7 +4,7 @@ Kotlin / Spring Boot 3 API for the Alternative Capital Partners Capital Call Tra
 
 ## Stack
 
-- Kotlin 1.9, Spring Boot 3.3, Java 17
+- Kotlin 1.9, Spring Boot 3.3, Java 21
 - `spring-boot-starter-web`, `-security`, `-oauth2-resource-server`, `-data-jpa`, `-validation`, `-actuator`
 - `kotlinx-coroutines-core` / `-reactor` for the async notice-generation feature
 - H2 in-memory database for local development
@@ -12,7 +12,7 @@ Kotlin / Spring Boot 3 API for the Alternative Capital Partners Capital Call Tra
 
 ## Prerequisites
 
-- JDK 17
+- JDK 21
 - No local Gradle install needed — use the wrapper (`./gradlew`, `gradlew.bat`)
 
 ## Entra ID setup (do this first)
